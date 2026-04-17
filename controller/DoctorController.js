@@ -1,0 +1,84 @@
+import Doctor from '../model/DoctorModel.js';
+
+export const addDoctor = async (req, res) => {
+  try {
+    const { doctorName, specialty, clinicName, contactNumber } = req.body;
+
+    if (!doctorName || !specialty || !clinicName) {
+      return res.status(400).json({ message: 'Doctor name, specialty, and clinic name are required' });
+    }
+
+    const doctor = new Doctor({
+      doctorName,
+      specialty,
+      clinicName,
+      contactNumber,
+      mr: req.user.id,
+    });
+
+    await doctor.save();
+    res.status(201).json({ message: 'Doctor added successfully', doctor });
+  } catch (error) {
+    console.error('Add doctor error:', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const getDoctors = async (req, res) => {
+  try {
+    const filter = req.user.role === 'admin' ? {} : { mr: req.user.id };
+    const doctors = await Doctor.find(filter).populate('mr', 'userName email');
+    res.status(200).json(doctors);
+  } catch (error) {
+    console.error('Fetch doctors error:', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const updateDoctor = async (req, res) => {
+  try {
+    const doctorId = req.params.id;
+    const doctor = await Doctor.findById(doctorId);
+
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
+
+    if (req.user.role !== 'admin' && doctor.mr.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Unauthorized to edit this doctor' });
+    }
+
+    const { doctorName, specialty, clinicName, contactNumber } = req.body;
+    if (doctorName) doctor.doctorName = doctorName;
+    if (specialty) doctor.specialty = specialty;
+    if (clinicName) doctor.clinicName = clinicName;
+    if (contactNumber !== undefined) doctor.contactNumber = contactNumber;
+
+    await doctor.save();
+    res.status(200).json({ message: 'Doctor updated successfully', doctor });
+  } catch (error) {
+    console.error('Update doctor error:', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const deleteDoctor = async (req, res) => {
+  try {
+    const doctorId = req.params.id;
+    const doctor = await Doctor.findById(doctorId);
+
+    if (!doctor) {
+      return res.status(404).json({ message: 'Doctor not found' });
+    }
+
+    if (req.user.role !== 'admin' && doctor.mr.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Unauthorized to delete this doctor' });
+    }
+
+    await doctor.remove();
+    res.status(200).json({ message: 'Doctor deleted successfully' });
+  } catch (error) {
+    console.error('Delete doctor error:', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

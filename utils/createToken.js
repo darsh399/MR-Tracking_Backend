@@ -8,7 +8,8 @@ const createToken = async (user) => {
         email: user.email,
         isAdmin: user.isAdmin,
         name: user.userName,
-        mobileNo: user.mobileNo
+        mobileNo: user.mobileNo,
+        role: user.role
      }, jsonSecretKey
      , {expiresIn: '1d'});
      return token;
