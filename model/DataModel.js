@@ -29,6 +29,20 @@ const DataModel = mongoose.Schema({
     enum: ['admin', 'mr'],
     default: 'mr',
   },
+  companyName: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  companyName: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  profileCompleted: {
+    type: Boolean,
+    default: false,
+  },
   isAdmin: {
     type: Boolean,
     default: false,

@@ -5,10 +5,14 @@ import createToken from '../utils/createToken.js';
 
 export const registerUser = async (req, res) => {
   try {
-    const { userName, email, mobileNo, password, role = 'mr' } = req.body;
+    const { userName, email, mobileNo, password, role = 'mr', companyName = '' } = req.body;
 
     if (!userName || !email || !mobileNo || !password) {
       return res.status(400).json({ message: 'All fields are required' });
+    }
+
+    if (role === 'admin' && !companyName.trim()) {
+      return res.status(400).json({ message: 'Company name is required for admin registration' });
     }
 
     const existingUser = await User.findOne({ email });
@@ -29,6 +33,7 @@ export const registerUser = async (req, res) => {
       password: hashedPassword,
       role: normalizedRole,
       isAdmin: normalizedRole === 'admin',
+      companyName: companyName.trim(),
       approved,
       isActive: true,
     });
@@ -46,6 +51,7 @@ export const registerUser = async (req, res) => {
         userName: newUser.userName,
         email: newUser.email,
         role: newUser.role,
+        companyName: newUser.companyName,
         approved: newUser.approved,
         isActive: newUser.isActive,
       },
@@ -98,6 +104,8 @@ export const loginUser = async (req, res) => {
         userName: user.userName,
         email: user.email,
         role: user.role,
+        companyName: user.companyName,
+        profileCompleted: user.profileCompleted,
         approved: user.approved,
         isActive: user.isActive,
       },
@@ -115,7 +123,18 @@ export const getCurrentUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
-    res.status(200).json({ user });
+    res.status(200).json({
+      user: {
+        id: user._id,
+        userName: user.userName,
+        email: user.email,
+        role: user.role,
+        companyName: user.companyName,
+        profileCompleted: user.profileCompleted,
+        approved: user.approved,
+        isActive: user.isActive,
+      },
+    });
   } catch (error) {
     console.error('Fetch current user error:', error.message || error);
     res.status(500).json({ message: 'Internal server error' });
@@ -159,7 +178,8 @@ export const logoutUser = async (req, res) => {
 
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find().select('-password');
+    const companyFilter = req.user.companyName ? { companyName: req.user.companyName } : {};
+    const users = await User.find(companyFilter).select('-password');
     res.status(200).json(users);
   } catch (error) {
     console.error('Fetch users error:', error.message || error);
@@ -199,15 +219,18 @@ export const deleteUser = async (req, res) => {
 
 
 export const getUserById = async (req, res) => {
-    try{
-        const userId = req.params.id;
-        const user = await User.findById(userId).select('-password');
-        if(!user){
-            return res.status(404).json({message: 'User not found'});
-        }
-        res.status(200).json(user);
-    }catch(error){
-        console.error('Error fetching user by ID:', error.message || error);
-        res.status(500).json({ message: 'Internal server error' });
+  try {
+    const userId = req.params.id;
+    const user = await User.findById(userId).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
-}
+    if (req.user.companyName && user.companyName !== req.user.companyName) {
+      return res.status(403).json({ message: 'Access denied for this user' });
+    }
+    res.status(200).json(user);
+  } catch (error) {
+    console.error('Error fetching user by ID:', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};

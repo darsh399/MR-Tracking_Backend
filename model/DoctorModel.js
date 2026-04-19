@@ -16,6 +16,10 @@ const doctorSchema = mongoose.Schema({
     required: true,
     trim: true,
   },
+  city: {
+    type: String,
+    trim: true,
+  },
   contactNumber: {
     type: String,
     trim: true,
