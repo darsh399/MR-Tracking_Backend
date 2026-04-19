@@ -1,11 +1,12 @@
 import express from 'express';
 import authMiddleware from '../middleware/authMiddleware.js';
+import companyMiddleware from '../middleware/companyMiddleware.js';
 import { permit } from '../middleware/roleMiddleware.js';
 import { getDashboardStats, getAdminVisits } from '../controller/AdminController.js';
 
 const router = express.Router();
 
-router.use(authMiddleware, permit('admin'));
+router.use(authMiddleware, companyMiddleware, permit('admin'));
 router.get('/dashboard', getDashboardStats);
 router.get('/visits', getAdminVisits);
 

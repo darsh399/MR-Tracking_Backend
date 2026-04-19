@@ -4,12 +4,15 @@ import Doctor from '../model/DoctorModel.js';
 
 export const getDashboardStats = async (req, res) => {
   try {
-    const totalMRs = await User.countDocuments({ role: 'mr' });
-    const totalVisits = await Visit.countDocuments();
-    const activeUsers = await User.countDocuments({ isActive: true });
-    const inactiveUsers = await User.countDocuments({ isActive: false });
+    const companyFilter = { companyName: req.user.companyName };
+
+    const totalMRs = await User.countDocuments({ role: 'mr', ...companyFilter });
+    const totalVisits = await Visit.countDocuments(companyFilter);
+    const activeUsers = await User.countDocuments({ isActive: true, ...companyFilter });
+    const inactiveUsers = await User.countDocuments({ isActive: false, ...companyFilter });
 
     const visitsPerDay = await Visit.aggregate([
+      { $match: companyFilter },
       {
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
@@ -20,6 +23,7 @@ export const getDashboardStats = async (req, res) => {
     ]);
 
     const topDoctors = await Visit.aggregate([
+      { $match: companyFilter },
       {
         $group: {
           _id: '$doctorName',
@@ -31,6 +35,7 @@ export const getDashboardStats = async (req, res) => {
     ]);
 
     const mrPerformance = await Visit.aggregate([
+      { $match: companyFilter },
       {
         $group: {
           _id: '$mr',
@@ -59,7 +64,7 @@ export const getDashboardStats = async (req, res) => {
       },
     ]);
 
-    const totalDoctors = await Doctor.countDocuments();
+    const totalDoctors = await Doctor.countDocuments(companyFilter);
 
     res.status(200).json({
       totalMRs,
@@ -80,7 +85,7 @@ export const getDashboardStats = async (req, res) => {
 export const getAdminVisits = async (req, res) => {
   try {
     const { startDate, endDate, mrName, doctorName } = req.query;
-    const filter = {};
+    const filter = { companyName: req.user.companyName };
 
     if (startDate || endDate) {
       filter.timestamp = {};

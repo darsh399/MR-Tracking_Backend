@@ -65,6 +65,7 @@ export const requestLeave = async (req, res) => {
     const leaveRequest = new LeaveRequest({
       user: req.user.id,
       profile: profile._id,
+      companyName: req.user.companyName,
       leaveType,
       startDate,
       endDate,
@@ -101,8 +102,8 @@ export const requestLeave = async (req, res) => {
 export const getLeaveRequests = async (req, res) => {
   try {
     const query = req.user.role === 'admin'
-      ? { status: 'pending' }
-      : { user: req.user.id };
+      ? { status: 'pending', companyName: req.user.companyName }
+      : { user: req.user.id, companyName: req.user.companyName };
 
     const leaveRequests = await LeaveRequest.find(query)
       .populate('profile', 'employeeId role leaveBalance')
@@ -122,6 +123,10 @@ export const updateLeaveRequest = async (req, res) => {
     const leaveRequest = await LeaveRequest.findById(id);
     if (!leaveRequest) {
       return res.status(404).json({ message: 'Leave request not found' });
+    }
+
+    if (leaveRequest.companyName !== req.user.companyName) {
+      return res.status(403).json({ message: 'Access denied: leave request from different company' });
     }
 
     const profile = await Profile.findById(leaveRequest.profile);

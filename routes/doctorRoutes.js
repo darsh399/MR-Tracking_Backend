@@ -1,5 +1,6 @@
 import express from 'express';
 import authMiddleware from '../middleware/authMiddleware.js';
+import companyMiddleware from '../middleware/companyMiddleware.js';
 import { permit } from '../middleware/roleMiddleware.js';
 import {
   addDoctor,
@@ -11,7 +12,7 @@ import {
 
 const router = express.Router();
 
-router.use(authMiddleware);
+router.use(authMiddleware, companyMiddleware);
 router.get('/', getDoctors);
 router.get('/:id', getDoctorById);
 router.post('/', permit('mr', 'admin'), addDoctor);

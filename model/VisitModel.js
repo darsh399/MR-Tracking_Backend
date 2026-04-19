@@ -29,16 +29,24 @@ const visitSchema = mongoose.Schema({
     type: String,
     trim: true,
   },
+
   location: {
-    lat: {
-      type: Number,
-      required: true,
-    },
-    lng: {
-      type: Number,
-      required: true,
-    },
+    lat: { type: Number, required: true },
+    lng: { type: Number, required: true },
   },
+
+  // ✅ NEW
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: true,
+  },
+  companyName: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
   timestamp: {
     type: Date,
     default: Date.now,

@@ -86,6 +86,7 @@ export const submitProfile = async (req, res) => {
 
     const profile = new Profile({
       user: req.user.id,
+      companyName: req.user.companyName,
       aadharNumber,
       panNumber,
       bloodGroup,

@@ -24,11 +24,28 @@ const doctorSchema = mongoose.Schema({
     type: String,
     trim: true,
   },
+  location: {
+    lat: { type: Number },
+    lng: { type: Number },
+  },
   mr: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true,
   },
+
+  // ✅ NEW
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: true,
+  },
+  companyName: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
   createdAt: {
     type: Date,
     default: Date.now,

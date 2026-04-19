@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const leaveRequestSchema = mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   profile: { type: mongoose.Schema.Types.ObjectId, ref: 'Profile', required: true },
+  companyName: { type: String, required: true, trim: true },
   leaveType: { type: String, enum: ['sick', 'casual', 'maternity'], required: true },
   startDate: { type: Date, required: true },
   endDate: { type: Date, required: true },

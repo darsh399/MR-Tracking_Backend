@@ -25,13 +25,16 @@ export const addVisit = async (req, res) => {
     let doctor = null;
     if (doctorId) {
       doctor = await Doctor.findById(doctorId);
+      if (doctor && doctor.companyName !== req.user.companyName) {
+        return res.status(403).json({ message: 'Access denied: doctor from different company' });
+      }
     }
 
     if (!doctor) {
       doctor = await Doctor.findOne({
         doctorName: doctorName.trim(),
         clinicName: clinicName.trim(),
-        mr: req.user.id,
+        companyName: req.user.companyName,
       });
     }
 
@@ -42,22 +45,23 @@ export const addVisit = async (req, res) => {
         clinicName: clinicName.trim(),
         contactNumber,
         mr: req.user.id,
+        company: req.user.company,
+        companyName: req.user.companyName,
       });
       await doctor.save();
     }
 
-    const lastVisit = await Visit.findOne({ mr: req.user.id, doctor: doctor._id }).sort({ timestamp: -1 });
     let locationMatched = true;
     let statusMessage = 'Visit recorded successfully';
 
-    if (lastVisit) {
+    if (doctor.location?.lat !== undefined && doctor.location?.lng !== undefined) {
       const distance = getDistanceInMeters(
         latitude,
         longitude,
-        lastVisit.location.lat,
-        lastVisit.location.lng
+        doctor.location.lat,
+        doctor.location.lng
       );
-      if (distance > 100) {
+      if (distance > 50) {
         locationMatched = false;
         statusMessage = 'Location not matched';
       }
@@ -74,6 +78,8 @@ export const addVisit = async (req, res) => {
         lat: latitude,
         lng: longitude,
       },
+      company: req.user.company,
+      companyName: req.user.companyName,
       timestamp: new Date(),
       locationMatched,
     });
@@ -89,8 +95,12 @@ export const addVisit = async (req, res) => {
 
 export const getVisitHistory = async (req, res) => {
   try {
-    const filter = req.user.role === 'admin' ? {} : { mr: req.user.id };
+    const filter = { companyName: req.user.companyName };
     const { startDate, endDate, mrName, doctorName } = req.query;
+
+    if (req.user.role !== 'admin') {
+      filter.mr = req.user.id;
+    }
 
     if (startDate || endDate) {
       filter.timestamp = {};

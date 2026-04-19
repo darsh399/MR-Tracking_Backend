@@ -30,6 +30,7 @@ const authMiddleware = async (req, res, next) => {
       name: user.userName,
       mobileNo: user.mobileNo,
       role: user.role,
+      company: user.company,
       companyName: user.companyName,
       profileCompleted: user.profileCompleted,
       approved: user.approved,

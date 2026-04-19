@@ -29,21 +29,19 @@ const DataModel = mongoose.Schema({
     enum: ['admin', 'mr'],
     default: 'mr',
   },
-  companyName: {
-    type: String,
-    trim: true,
-    default: '',
+
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: true,
   },
   companyName: {
     type: String,
+    required: true,
     trim: true,
-    default: '',
   },
+
   profileCompleted: {
-    type: Boolean,
-    default: false,
-  },
-  isAdmin: {
     type: Boolean,
     default: false,
   },

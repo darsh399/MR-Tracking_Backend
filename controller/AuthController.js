@@ -1,15 +1,16 @@
 import bcrypt from 'bcrypt';
 import User from '../model/DataModel.js';
+import Company from '../model/CompanyModel.js';
 import hashPassword from '../utils/HashPassword.js';
 import createToken from '../utils/createToken.js';
 import sendEmail from '../utils/sendEmail.js';
 import { activationConfirmationTemplate, activateUserTemplate } from '../configue/mailFormat.js';
 export const registerUser = async (req, res) => {
   try {
-    const { userName, email, mobileNo, password, role = 'mr', companyName = '' } = req.body;
+    const { userName, email, mobileNo, password, role = 'mr', companyName } = req.body;
 
-    if (!userName || !email || !mobileNo || !password) {
-      return res.status(400).json({ message: 'All fields are required' });
+    if (!userName || !email || !mobileNo || !password || !companyName) {
+      return res.status(400).json({ message: 'All fields including company name are required' });
     }
 
     if (role === 'admin' && !companyName.trim()) {
@@ -23,6 +24,16 @@ export const registerUser = async (req, res) => {
 
     const normalizedRole = role === 'admin' ? 'admin' : 'mr';
     const requiresApproval = normalizedRole === 'mr';
+
+    let company = await Company.findOne({ name: companyName.trim() });
+    if (!company) {
+      if (normalizedRole === 'admin') {
+        company = new Company({ name: companyName.trim() });
+        await company.save();
+      } else {
+        return res.status(400).json({ message: 'Company does not exist. Please contact admin.' });
+      }
+    }
     const adminCount = await User.countDocuments({ role: 'admin' });
     const approved = normalizedRole === 'admin' && adminCount === 0 ? true : !requiresApproval;
 
@@ -33,13 +44,18 @@ export const registerUser = async (req, res) => {
       mobileNo,
       password: hashedPassword,
       role: normalizedRole,
-      isAdmin: normalizedRole === 'admin',
+      company: company._id,
       companyName: companyName.trim(),
       approved,
       isActive: true,
     });
 
     await newUser.save();
+
+    if (normalizedRole === 'admin' && !company.admin) {
+      company.admin = newUser._id;
+      await company.save();
+    }
 
     const message = normalizedRole === 'mr'
       ? 'MR registration submitted. Await admin approval.'

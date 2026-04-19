@@ -2,7 +2,7 @@ import Doctor from '../model/DoctorModel.js';
 
 export const addDoctor = async (req, res) => {
   try {
-    const { doctorName, specialty, clinicName, city, contactNumber } = req.body;
+    const { doctorName, specialty, clinicName, city, contactNumber, latitude, longitude } = req.body;
 
     if (!doctorName || !specialty || !clinicName) {
       return res.status(400).json({ message: 'Doctor name, specialty, and clinic name are required' });
@@ -14,7 +14,10 @@ export const addDoctor = async (req, res) => {
       clinicName,
       city,
       contactNumber,
+      location: latitude !== undefined && longitude !== undefined ? { lat: Number(latitude), lng: Number(longitude) } : undefined,
       mr: req.user.id,
+      company: req.user.company,
+      companyName: req.user.companyName,
     });
 
     await doctor.save();
@@ -28,13 +31,13 @@ export const addDoctor = async (req, res) => {
 export const getDoctors = async (req, res) => {
   try {
     const { city } = req.query;
-    const filter = req.user.role === 'admin' ? {} : { mr: req.user.id };
+    const filter = { companyName: req.user.companyName };
 
     if (city) {
       filter.city = new RegExp(`^${city.trim()}$`, 'i');
     }
 
-    const doctors = await Doctor.find(filter).populate('mr', 'userName email');
+    const doctors = await Doctor.find(filter).populate('mr', 'userName email role');
     res.status(200).json(doctors);
   } catch (error) {
     console.error('Fetch doctors error:', error.message || error);
@@ -49,6 +52,10 @@ export const updateDoctor = async (req, res) => {
 
     if (!doctor) {
       return res.status(404).json({ message: 'Doctor not found' });
+    }
+
+    if (doctor.companyName !== req.user.companyName) {
+      return res.status(403).json({ message: 'Access denied: doctor from different company' });
     }
 
     if (req.user.role !== 'admin' && doctor.mr.toString() !== req.user.id) {
@@ -79,6 +86,10 @@ export const deleteDoctor = async (req, res) => {
       return res.status(404).json({ message: 'Doctor not found' });
     }
 
+    if (doctor.companyName !== req.user.companyName) {
+      return res.status(403).json({ message: 'Access denied: doctor from different company' });
+    }
+
     if (req.user.role !== 'admin' && doctor.mr.toString() !== req.user.id) {
       return res.status(403).json({ message: 'Unauthorized to delete this doctor' });
     }
@@ -100,8 +111,8 @@ export const getDoctorById = async (req, res) => {
       return res.status(404).json({ message: 'Doctor not found' });
     }
 
-    if (req.user.role !== 'admin' && doctor.mr._id.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Unauthorized to view this doctor' });
+    if (doctor.companyName !== req.user.companyName) {
+      return res.status(403).json({ message: 'Access denied: doctor from different company' });
     }
 
     res.status(200).json(doctor);

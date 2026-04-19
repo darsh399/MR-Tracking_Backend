@@ -8,6 +8,7 @@ const leaveSchema = mongoose.Schema({
 
 const profileSchema = mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+  companyName: { type: String, required: true, trim: true },
   aadharNumber: { type: String, required: true, trim: true },
   panNumber: { type: String, required: true, trim: true },
   bloodGroup: { type: String, required: true, trim: true },
