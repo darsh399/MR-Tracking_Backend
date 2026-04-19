@@ -7,7 +7,7 @@ const sendEmail = async (to, subject, html, options = {}) => {
             to,
             subject,
             html,
-            ...options // Allow additional options like attachments, cc, bcc, etc.
+            ...options 
         };
 
         const result = await transporter.sendMail(mailOptions);
