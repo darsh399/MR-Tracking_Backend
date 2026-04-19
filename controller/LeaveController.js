@@ -1,5 +1,6 @@
 import LeaveRequest from '../model/LeaveModel.js';
 import Profile from '../model/ProfileModel.js';
+import { sendLeaveRequestEmail, sendLeaveApprovalEmail } from '../utils/emailService.js';
 
 const roundToTwo = (value) => Math.round(value * 100) / 100;
 
@@ -71,6 +72,25 @@ export const requestLeave = async (req, res) => {
       reason,
     });
     await leaveRequest.save();
+
+    // Send email notification to the user
+    try {
+      const user = await require('../model/DataModel.js').findById(req.user.id);
+      if (user && user.email) {
+        await sendLeaveRequestEmail(
+          user.email,
+          user.userName,
+          leaveType,
+          new Date(startDate).toLocaleDateString(),
+          new Date(endDate).toLocaleDateString(),
+          reason
+        );
+      }
+    } catch (emailError) {
+      console.error('Failed to send leave request email:', emailError.message);
+      // Don't fail the request if email fails
+    }
+
     res.status(201).json({ message: 'Leave request submitted', leaveRequest });
   } catch (error) {
     console.error('Request leave error:', error.message || error);
@@ -126,6 +146,24 @@ export const updateLeaveRequest = async (req, res) => {
     leaveRequest.status = status;
     await profile.save();
     await leaveRequest.save();
+
+    // Send email notification to the user about approval/rejection
+    try {
+      const user = await require('../model/DataModel.js').findById(leaveRequest.user);
+      if (user && user.email) {
+        await sendLeaveApprovalEmail(
+          user.email,
+          user.userName,
+          leaveType,
+          new Date(leaveRequest.startDate).toLocaleDateString(),
+          new Date(leaveRequest.endDate).toLocaleDateString(),
+          status
+        );
+      }
+    } catch (emailError) {
+      console.error('Failed to send leave approval email:', emailError.message);
+      // Don't fail the request if email fails
+    }
 
     res.status(200).json({ leaveRequest });
   } catch (error) {

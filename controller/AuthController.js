@@ -2,7 +2,8 @@ import bcrypt from 'bcrypt';
 import User from '../model/DataModel.js';
 import hashPassword from '../utils/HashPassword.js';
 import createToken from '../utils/createToken.js';
-
+import sendEmail from '../utils/sendEmail.js';
+import { activationConfirmationTemplate, activateUserTemplate } from '../configue/mailFormat.js';
 export const registerUser = async (req, res) => {
   try {
     const { userName, email, mobileNo, password, role = 'mr', companyName = '' } = req.body;
@@ -153,7 +154,7 @@ export const approveUser = async (req, res) => {
     if (!updatedUser) {
       return res.status(404).json({ message: 'User not found' });
     }
-
+    sendEmail(updatedUser.email, 'Account Activation Notice', activateUserTemplate(updatedUser.userName));
     res.status(200).json({ message: 'User approved successfully', user: updatedUser });
   } catch (error) {
     console.error('Approve user error:', error.message || error);
@@ -196,6 +197,10 @@ export const toggleUserStatus = async (req, res) => {
     }
     user.isActive = !user.isActive;
     await user.save();
+    if(!user.isActive) {
+      sendEmail(user.email, 'Account Deactivation Notice', activationConfirmationTemplate(user.userName));
+    }
+    
     res.status(200).json({ message: 'User status updated', user });
   } catch (error) {
     console.error('Toggle user status error:', error.message || error);
