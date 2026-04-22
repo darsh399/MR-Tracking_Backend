@@ -1,6 +1,8 @@
 import LeaveRequest from '../model/LeaveModel.js';
 import Profile from '../model/ProfileModel.js';
 import { sendLeaveRequestEmail, sendLeaveApprovalEmail } from '../utils/emailService.js';
+import fs from 'fs';
+import path from 'path';
 
 const roundToTwo = (value) => Math.round(value * 100) / 100;
 
@@ -42,6 +44,11 @@ const accrueLeaveBalance = async (profile) => {
 
 export const requestLeave = async (req, res) => {
   try {
+    console.log('Received leave request:', {
+      userId: req.user.id,
+      companyName: req.user.companyName,
+      body: req.body,
+    });
     const { leaveType, startDate, endDate, reason } = req.body;
     if (!leaveType || !startDate || !endDate || !reason) {
       return res.status(400).json({ message: 'All leave fields are required' });
@@ -72,6 +79,21 @@ export const requestLeave = async (req, res) => {
       daysRequested,
       reason,
     });
+
+    // Handle attachments if files were uploaded
+    if (req.files && req.files.length > 0) {
+      req.files.forEach((file) => {
+        // Store relative path for easy URL construction
+        const relativePath = `attachments/${file.filename}`;
+        leaveRequest.attachments.push({
+          filename: file.originalname,
+          path: relativePath,
+          mimetype: file.mimetype,
+          size: file.size,
+        });
+      });
+    }
+
     await leaveRequest.save();
 
     // Send email notification to the user
@@ -102,12 +124,13 @@ export const requestLeave = async (req, res) => {
 export const getLeaveRequests = async (req, res) => {
   try {
     const query = req.user.role === 'admin'
-      ? { status: 'pending', companyName: req.user.companyName }
+      ? { companyName: req.user.companyName }
       : { user: req.user.id, companyName: req.user.companyName };
 
     const leaveRequests = await LeaveRequest.find(query)
       .populate('profile', 'employeeId role leaveBalance')
-      .populate('user', 'userName email');
+      .populate('user', 'userName email')
+      .sort({ createdAt: -1 }); // Sort by newest first
 
     res.status(200).json({ leaveRequests });
   } catch (error) {
@@ -173,6 +196,53 @@ export const updateLeaveRequest = async (req, res) => {
     res.status(200).json({ leaveRequest });
   } catch (error) {
     console.error('Update leave request error:', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const downloadAttachment = async (req, res) => {
+  try {
+    const { leaveRequestId, attachmentIndex } = req.params;
+
+    const leaveRequest = await LeaveRequest.findById(leaveRequestId);
+    if (!leaveRequest) {
+      return res.status(404).json({ message: 'Leave request not found' });
+    }
+
+    // Verify user has access to this leave request
+    if (leaveRequest.user.toString() !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const attachmentIndex_num = parseInt(attachmentIndex);
+    if (attachmentIndex_num < 0 || attachmentIndex_num >= leaveRequest.attachments.length) {
+      return res.status(404).json({ message: 'Attachment not found' });
+    }
+
+    const attachment = leaveRequest.attachments[attachmentIndex_num];
+    // Construct full file path
+    const filePath = path.resolve('uploads', attachment.path);
+
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ message: 'File not found on server' });
+    }
+
+    // Set proper headers for download
+    res.setHeader('Content-Type', attachment.mimetype);
+    res.setHeader('Content-Disposition', `attachment; filename="${attachment.filename}"`);
+    res.setHeader('Content-Length', attachment.size);
+
+    // Stream the file
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+    fileStream.on('error', (error) => {
+      console.error('File stream error:', error);
+      res.status(500).json({ message: 'Error downloading file' });
+    });
+  } catch (error) {
+    console.error('Download attachment error:', error.message || error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

@@ -10,7 +10,8 @@ import {
   getAllUsers,
   toggleUserStatus,
   deleteUser,
-  getUserById
+  getUserById,
+  updateUser
 } from '../controller/AuthController.js';
 
 const router = express.Router();
@@ -19,6 +20,7 @@ router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/logout', logoutUser);
 router.get('/me', authMiddleware, getCurrentUser);
+router.patch('/update-user',authMiddleware, updateUser);
 router.get('/user/:id', authMiddleware, permit('admin'), getUserById);
 router.get('/users', authMiddleware, permit('admin'), getAllUsers);
 router.put('/approve/:id', authMiddleware, permit('admin'), approveUser);

@@ -122,6 +122,7 @@ export const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         companyName: user.companyName,
+        mobileNo: user.mobileNo,
         profileCompleted: user.profileCompleted,
         approved: user.approved,
         isActive: user.isActive,
@@ -140,6 +141,18 @@ export const getCurrentUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    console.log('Current user fetched:', {
+      id: user._id,
+      userName: user.userName,
+      email: user.email,
+      role: user.role,
+      companyName: user.companyName,
+
+      profileCompleted: user.profileCompleted,
+      approved: user.approved,
+      isActive: user.isActive,
+      mobileNo: user.mobileNo,
+    });
     res.status(200).json({
       user: {
         id: user._id,
@@ -147,6 +160,7 @@ export const getCurrentUser = async (req, res) => {
         email: user.email,
         role: user.role,
         companyName: user.companyName,
+        mobileNo: user.mobileNo,
         profileCompleted: user.profileCompleted,
         approved: user.approved,
         isActive: user.isActive,
@@ -159,6 +173,7 @@ export const getCurrentUser = async (req, res) => {
 };
 
 export const approveUser = async (req, res) => {
+  console.log('Approve user request received for user ID:', req.params.id);
   try {
     const userId = req.params.id;
     const updatedUser = await User.findByIdAndUpdate(
@@ -255,3 +270,38 @@ export const getUserById = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+
+export const updateUser = async (req, res) => {
+  try {
+    console.log(req.body)
+    const userId = req.user.id;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+
+    const { userName, email, mobileNo, companyName, password } = req.body;
+    if(!password){
+      return res.status(400).json({ message: 'Current password is required' });
+    }
+    const verifiedUser =await bcrypt.compare(password, user.password);
+      if (!verifiedUser) {
+      return res.status(400).json({
+        message: 'Password not matched, please enter correct password',
+      });
+    }
+    
+    if (userName) user.userName = userName;
+    if (email) user.email = email;
+    if (mobileNo) user.mobileNo = mobileNo;
+    if (companyName) user.companyName = companyName;
+
+    await user.save();
+    res.status(200).json({ message: 'User updated successfully', user: user.toObject({ getters: true, virtuals: false }) });
+  } catch (error) {
+    console.error('Update user error:', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+}
