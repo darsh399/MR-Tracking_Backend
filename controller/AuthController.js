@@ -247,6 +247,10 @@ export const toggleUserStatus = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const userId = req.params.id;
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
     const deletedUser = await User.findByIdAndDelete(userId);
     if (!deletedUser) {
       return res.status(404).json({ message: 'User not found' });
@@ -259,41 +263,20 @@ export const deleteUser = async (req, res) => {
 };
 
 
-// export const getUserById = async (req, res) => {
-//   try {
-//     const userId = req.params.id;
-//     const user = await User.findById(userId).select('-password');
-//     if (!user) {
-//       return res.status(404).json({ message: 'User not found' });
-//     }
-//     if (req.user.companyName && user.companyName !== req.user.companyName) {
-//       return res.status(403).json({ message: 'Access denied for this user' });
-//     }
-//     res.status(200).json(user);
-//   } catch (error) {
-//     console.error('Error fetching user by ID:', error.message || error);
-//     res.status(500).json({ message: 'Internal server error' });
-//   }
-// };
-
-
 export const getUserById = async (req, res) => {
   try {
     const userId = req.params.id;
 
-    // ✅ 1. Get user
     const user = await User.findById(userId).select('-password');
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // ✅ 2. Company security check
     if (req.user.companyName && user.companyName !== req.user.companyName) {
       return res.status(403).json({ message: 'Access denied for this user' });
     }
 
-    // ✅ 3. Fetch ALL related data (parallel 🚀)
     const [profile, leaves, visits, doctors] = await Promise.all([
       Profile.findOne({ user: userId }),
       Leave.find({ user: userId }).sort({ createdAt: -1 }),
@@ -301,7 +284,6 @@ export const getUserById = async (req, res) => {
       Doctor.find({ mr: userId }).sort({ createdAt: -1 }),
     ]);
 
-    // ✅ 4. Final response
     res.status(200).json({
       user,
       profile,

@@ -1,6 +1,7 @@
 import User from '../model/DataModel.js';
 import Visit from '../model/VisitModel.js';
 import Doctor from '../model/DoctorModel.js';
+import { sendBulkUserNotification } from '../utils/emailService.js';
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -78,6 +79,39 @@ export const getDashboardStats = async (req, res) => {
     });
   } catch (error) {
     console.error('Admin dashboard error:', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const sendCompanyEmailToAll = async (req, res) => {
+  try {
+    const { subject, body } = req.body;
+    if (!subject || !body) {
+      return res.status(400).json({ message: 'Email subject and body are required' });
+    }
+
+    const recipients = await User.find({
+      companyName: req.user.companyName,
+      email: { $exists: true, $ne: '' },
+    }).select('email');
+
+    const emailAddresses = recipients.map((user) => user.email).filter(Boolean);
+    if (emailAddresses.length === 0) {
+      return res.status(404).json({ message: 'No company employees found with valid email addresses' });
+    }
+
+    const results = await sendBulkUserNotification(emailAddresses, subject, body);
+    const successCount = results.filter((item) => item.success).length;
+    const failureCount = results.filter((item) => !item.success).length;
+
+    res.status(200).json({
+      message: 'Emails queued for delivery',
+      successCount,
+      failureCount,
+      results,
+    });
+  } catch (error) {
+    console.error('Send company email error:', error.message || error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

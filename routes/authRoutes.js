@@ -25,6 +25,6 @@ router.get('/user/:id', authMiddleware, permit('admin'), getUserById);
 router.get('/users', authMiddleware, permit('admin'), getAllUsers);
 router.put('/approve/:id', authMiddleware, permit('admin'), approveUser);
 router.put('/user/:id/status', authMiddleware, permit('admin'), toggleUserStatus);
-router.delete('/user/:id', authMiddleware, permit('admin'), deleteUser);
+router.delete('/user/:id', authMiddleware, deleteUser);
 
 export default router;

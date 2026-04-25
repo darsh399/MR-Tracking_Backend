@@ -34,7 +34,6 @@ const doctorSchema = mongoose.Schema({
     required: true,
   },
 
-  // ✅ NEW
   company: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',
