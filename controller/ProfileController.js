@@ -256,12 +256,16 @@ export const updateReportingManager = async (req, res) => {
       return res.status(403).json({ message: 'You are not allowed to change reporting managers' });
     }
 
-    if (reportsTo && reportsTo.toString() === targetProfile._id.toString()) {
+    const normalizedReportsTo = reportsTo && mongoose.Types.ObjectId.isValid(reportsTo)
+      ? new mongoose.Types.ObjectId(reportsTo)
+      : null;
+
+    if (normalizedReportsTo && normalizedReportsTo.toString() === targetProfile._id.toString()) {
       return res.status(400).json({ message: 'Circular reporting is not allowed' });
     }
 
-    if (reportsTo) {
-      const managerProfile = await Profile.findOne({ _id: reportsTo, companyName: req.user.companyName });
+    if (normalizedReportsTo) {
+      const managerProfile = await Profile.findOne({ _id: normalizedReportsTo, companyName: req.user.companyName });
       if (!managerProfile) {
         return res.status(400).json({ message: 'Manager must belong to the same company' });
       }
@@ -277,10 +281,19 @@ export const updateReportingManager = async (req, res) => {
       }
     }
 
-    targetProfile.reportsTo = reportsTo ? mongoose.Types.ObjectId.createFromHexString(reportsTo) : null;
+    targetProfile.reportsTo = normalizedReportsTo;
+    targetProfile.managerName = normalizedReportsTo
+      ? (await Profile.findById(normalizedReportsTo).populate('user', 'userName').lean())?.user?.userName || ''
+      : '';
+    const managerProfile = normalizedReportsTo
+      ? await Profile.findById(normalizedReportsTo).lean()
+      : null;
+    targetProfile.managerDesignation = managerProfile?.designation || managerProfile?.role || '';
+    targetProfile.managerEmployeeId = managerProfile?.employeeId || '';
     await targetProfile.save();
     const updatedProfile = await Profile.findById(targetProfile._id).populate('user', 'userName').lean();
-    res.status(200).json({ profile: updatedProfile });
+    const enrichedProfile = await populateManagerMeta(updatedProfile);
+    res.status(200).json({ profile: enrichedProfile });
   } catch (error) {
     console.error('Update reporting manager error:', error.message || error);
     res.status(500).json({ message: 'Internal server error' });
