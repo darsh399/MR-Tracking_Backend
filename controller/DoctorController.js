@@ -31,7 +31,13 @@ export const addDoctor = async (req, res) => {
 export const getDoctors = async (req, res) => {
   try {
     const { city } = req.query;
-    const filter = { companyName: req.user.companyName };
+    const companyFilter = req.user.company || req.user.companyId;
+    const filter = {
+      $or: [
+        { company: companyFilter },
+        { companyName: req.user.companyName },
+      ],
+    };
 
     if (city) {
       filter.city = new RegExp(`^${city.trim()}$`, 'i');
@@ -111,7 +117,7 @@ export const getDoctorById = async (req, res) => {
       return res.status(404).json({ message: 'Doctor not found' });
     }
 
-    if (doctor.companyName !== req.user.companyName) {
+     if (doctor.companyName !== req.user.companyName) {
       return res.status(403).json({ message: 'Access denied: doctor from different company' });
     }
 

@@ -7,6 +7,7 @@ import hashPassword from '../utils/HashPassword.js';
 import bcrypt from 'bcrypt';
 import sendEmail from '../utils/sendEmail.js';
 import { passwordResetConfirmationTemplate } from '../configue/mailFormat.js';
+import { accrueLeaveBalance } from './LeaveController.js';
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -19,14 +20,14 @@ const storage = multer.diskStorage({
     cb(null, `${req.user.id}-${uniqueSuffix}${path.extname(file.originalname)}`);
   },
 });
-
+      
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
     cb(null, allowedTypes.includes(file.mimetype));
-  },
+  }, 
 }).fields([
   { name: 'salarySlips', maxCount: 4 },
   { name: 'offerLetters', maxCount: 2 },
@@ -51,6 +52,10 @@ const buildExperienceMonths = (years, months) => {
 export const submitProfile = async (req, res) => {
   try {
     const {
+      userName,
+      mobileNo,
+      employeeId,
+      department,
       aadharNumber,
       panNumber,
       bloodGroup,
@@ -59,24 +64,31 @@ export const submitProfile = async (req, res) => {
       pincode,
       emergencyContact,
       joiningDate,
-      department,
-      experienceType,
+      experienceType = 'fresher',
       previousCompany,
       experienceYears,
       experienceMonths,
     } = req.body;
     const role = req.user.role;
+    const isCompanyOwner = role === 'companyOwner';
+    const displayName = userName?.trim() || req.user.userName || req.user.email;
 
     const existingProfile = await Profile.findOne({ user: req.user.id });
     if (existingProfile) {
       return res.status(400).json({ message: 'Profile already completed' });
     }
 
-    const totalExperienceMonths = experienceType === 'experienced'
-      ? buildExperienceMonths(experienceYears, experienceMonths)
-      : 0;
+    if (isCompanyOwner && !mobileNo?.trim()) {
+      return res.status(400).json({ message: 'Mobile number is required for company owner onboarding' });
+    }
 
-    const employeeId = `EMP${Date.now()}`;
+    const totalExperienceMonths = isCompanyOwner
+      ? 0
+      : experienceType === 'experienced'
+        ? buildExperienceMonths(experienceYears, experienceMonths)
+        : 0;
+
+    const newEmployeeId = employeeId?.trim() || `EMP${Date.now()}`;
 
     const documents = {
       salarySlips: req.files.salarySlips?.map((file) => file.path) || [],
@@ -87,25 +99,34 @@ export const submitProfile = async (req, res) => {
     const profile = new Profile({
       user: req.user.id,
       companyName: req.user.companyName,
-      aadharNumber,
-      panNumber,
-      bloodGroup,
-      address: { city, state, pincode },
-      emergencyContact,
-      employeeId,
+      aadharNumber: isCompanyOwner ? '' : aadharNumber,
+      panNumber: isCompanyOwner ? '' : panNumber,
+      bloodGroup: isCompanyOwner ? '' : bloodGroup,
+      address: {
+        city: isCompanyOwner ? '' : city,
+        state: isCompanyOwner ? '' : state,
+        pincode: isCompanyOwner ? '' : pincode,
+      },
+      emergencyContact: emergencyContact?.trim() || '',
+      employeeId: newEmployeeId,
       role,
-      joiningDate,
-      department,
-      experienceType,
-      previousCompany: experienceType === 'experienced' ? previousCompany : '',
+      joiningDate: joiningDate ? new Date(joiningDate) : req.user.joiningDate || new Date(),
+      department: isCompanyOwner ? 'Company Owner' : department,
+      experienceType: isCompanyOwner ? 'fresher' : experienceType,
+      previousCompany: isCompanyOwner ? '' : (experienceType === 'experienced' ? previousCompany : ''),
       totalExperienceMonths,
       documents,
-      leaveBalance: { sick: 12, casual: 10, maternity: role === 'admin' ? 180 : 180 },
-      leaveBalanceLastUpdated: new Date(),
+      leaveBalance: { sick: 0, casual: 0, maternity: 180 },
+      leaveBalanceLastUpdated: joiningDate ? new Date(joiningDate) : new Date(),
     });
-
+ 
     await profile.save();
-    await User.findByIdAndUpdate(req.user.id, { profileCompleted: true });
+    await User.findByIdAndUpdate(req.user.id, {
+      profileCompleted: true,
+      isOnboarded: true,
+      userName: displayName,
+      mobileNo: mobileNo?.trim() || req.user.mobileNo,
+    });
 
     res.status(201).json({ message: 'Profile completed successfully', profile });
   } catch (error) {
@@ -120,6 +141,8 @@ export const getProfile = async (req, res) => {
     if (!profile) {
       return res.status(404).json({ message: 'Profile not found' });
     }
+
+    await accrueLeaveBalance(profile);
     await profile.populate('user', 'userName email role companyName');
     res.status(200).json({ profile });
   } catch (error) {
@@ -175,8 +198,9 @@ export const resetPassword = async (req, res) => {
     }
 
     user.password = await hashPassword(newPassword);
+    user.isFirstLogin = false;
     await user.save();
-
+   
    
     sendEmail(
       user.email,

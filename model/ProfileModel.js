@@ -9,20 +9,20 @@ const leaveSchema = mongoose.Schema({
 const profileSchema = mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
   companyName: { type: String, required: true, trim: true },
-  aadharNumber: { type: String, required: true, trim: true },
-  panNumber: { type: String, required: true, trim: true },
-  bloodGroup: { type: String, required: true, trim: true },
+  aadharNumber: { type: String, trim: true, required: function () { return this.role !== 'companyOwner'; }, default: '' },
+  panNumber: { type: String, trim: true, required: function () { return this.role !== 'companyOwner'; }, default: '' },
+  bloodGroup: { type: String, trim: true, required: function () { return this.role !== 'companyOwner'; }, default: '' },
   address: {
-    city: { type: String, required: true, trim: true },
-    state: { type: String, required: true, trim: true },
-    pincode: { type: String, required: true, trim: true },
+    city: { type: String, trim: true, required: function () { return this.role !== 'companyOwner'; }, default: '' },
+    state: { type: String, trim: true, required: function () { return this.role !== 'companyOwner'; }, default: '' },
+    pincode: { type: String, trim: true, required: function () { return this.role !== 'companyOwner'; }, default: '' },
   },
-  emergencyContact: { type: String, required: true, trim: true },
+  emergencyContact: { type: String, trim: true, default: '' },
   employeeId: { type: String, required: true, unique: true },
-  role: { type: String, enum: ['admin', 'mr'], required: true },
+  role: { type: String, enum: ['admin', 'companyOwner', 'hr', 'hrManager', 'projectManager', 'mr', 'employee'], required: true },
   joiningDate: { type: Date, required: true },
-  department: { type: String, required: true, trim: true },
-  experienceType: { type: String, enum: ['fresher', 'experienced'], required: true },
+  department: { type: String, trim: true, required: function () { return this.role !== 'companyOwner'; }, default: '' },
+  experienceType: { type: String, enum: ['fresher', 'experienced'], default: 'fresher' },
   previousCompany: { type: String, trim: true },
   totalExperienceMonths: { type: Number, default: 0 },
   documents: {
@@ -38,5 +38,6 @@ const profileSchema = mongoose.Schema({
   leaveBalanceLastUpdated: { type: Date, default: Date.now },
   createdAt: { type: Date, default: Date.now },
 });
+
 
 export default mongoose.model('Profile', profileSchema);

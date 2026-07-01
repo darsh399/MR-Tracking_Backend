@@ -6,7 +6,7 @@ import { getDashboardStats, getAdminVisits, sendCompanyEmailToAll } from '../con
 
 const router = express.Router();
 
-router.use(authMiddleware, companyMiddleware, permit('admin'));
+router.use(authMiddleware, companyMiddleware, permit('admin', 'companyOwner', 'hr', 'hrManager'));
 router.get('/dashboard', getDashboardStats);
 router.get('/visits', getAdminVisits);
 router.post('/send-mail-all', sendCompanyEmailToAll);

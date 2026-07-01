@@ -2,19 +2,34 @@ import sendEmail from './sendEmail.js';
 import {
   activateUserTemplate,
   activationConfirmationTemplate,
+  otpVerificationTemplate,
+  inviteUserTemplate,
   passwordResetTemplate,
+  passwordResetOtpTemplate,
   passwordResetConfirmationTemplate,
   onboardingCompletionTemplate,
   deactivationNotificationTemplate,
   leaveRequestTemplate,
   leaveApprovalTemplate,
-  visitReminderTemplate
+  visitReminderTemplate,
+  approvalPendingTemplate,
+  approvalGrantedTemplate,
 } from '../configue/mailFormat.js';
 
-// User account emails
+// User account emails                                    
+export const sendInvitationEmail = async (email, userName, loginEmail, temporaryPassword) => {
+  const html = inviteUserTemplate(userName, loginEmail, temporaryPassword);
+  return sendEmail(email, 'Your access invite to Medical Visit Management', html);
+};
+
 export const sendActivationEmail = async (email, userName, token) => {
   const html = activateUserTemplate(userName, token);
   return sendEmail(email, 'Account Activation Required', html);
+};
+
+export const sendOtpVerificationEmail = async (email, userName, otpCode, loginEmail, temporaryPassword = null) => {
+  const html = otpVerificationTemplate(userName, otpCode, loginEmail, temporaryPassword);
+  return sendEmail(email, 'Your Account OTP Verification', html);
 };
 
 export const sendActivationConfirmationEmail = async (email, userName) => {
@@ -22,9 +37,24 @@ export const sendActivationConfirmationEmail = async (email, userName) => {
   return sendEmail(email, 'Account Activated Successfully', html);
 };
 
+export const sendApprovalPendingEmail = async (email, userName, role, companyName, loginEmail = null, temporaryPassword = null) => {
+  const html = approvalPendingTemplate(userName, role, companyName, loginEmail, temporaryPassword);
+  return sendEmail(email, 'Your account request is pending approval', html);
+};
+
+export const sendApprovalGrantedEmail = async (email, userName, loginEmail) => {
+  const html = approvalGrantedTemplate(userName, loginEmail);
+  return sendEmail(email, 'Your account has been approved', html);
+};
+
 export const sendPasswordResetEmail = async (email, userName, token) => {
   const html = passwordResetTemplate(userName, token);
   return sendEmail(email, 'Password Reset Request', html);
+};
+
+export const sendPasswordResetOtpEmail = async (email, userName, otpCode) => {
+  const html = passwordResetOtpTemplate(userName, otpCode);
+  return sendEmail(email, 'Your Password Reset OTP', html);
 };
 
 export const sendPasswordResetConfirmationEmail = async (email, userName) => {
@@ -145,8 +175,10 @@ export const sendBulkUserNotification = async (userEmails, subject, message) => 
 
 export default {
   sendActivationEmail,
+  sendOtpVerificationEmail,
   sendActivationConfirmationEmail,
   sendPasswordResetEmail,
+  sendPasswordResetOtpEmail,
   sendPasswordResetConfirmationEmail,
   sendOnboardingCompletionEmail,
   sendDeactivationNotificationEmail,
@@ -155,4 +187,4 @@ export default {
   sendVisitReminderEmail,
   sendAdminNotificationEmail,
   sendBulkUserNotification
-};
+};  

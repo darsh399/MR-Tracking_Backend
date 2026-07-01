@@ -21,6 +21,42 @@ const calculateDaysRequested = (startDate, endDate) => {
   return Math.floor(differenceMs / (1000 * 60 * 60 * 24)) + 1;
 };
 
+const canManageLeaveRequest = (viewerRole, requesterRole) => {
+  const actualRequesterRole = requesterRole || 'employee';
+
+  if (['admin', 'companyOwner', 'hrManager'].includes(viewerRole)) {
+    return true;
+  }
+
+  if (viewerRole === 'hr' && actualRequesterRole === 'employee') {
+    return true;
+  }
+
+  return false;
+};
+
+const buildLeaveQueryForUser = (user) => {
+  const baseQuery = { companyName: user.companyName };
+
+  switch (user.role) {
+    case 'admin':
+    case 'companyOwner':
+    case 'hrManager':
+      return baseQuery;
+    case 'hr':
+      return {
+        companyName: user.companyName,
+        $or: [
+          { user: user.id },
+          { requesterRole: 'employee' },
+          { requesterRole: { $exists: false } },
+        ],
+      };
+    default:
+      return { user: user.id, companyName: user.companyName };
+  }
+};
+
 const getMonthsElapsed = (fromDate, toDate) => {
   const start = new Date(fromDate);
   const end = new Date(toDate);
@@ -36,25 +72,30 @@ const getMonthsElapsed = (fromDate, toDate) => {
   return Math.max(0, months);
 };
 
-const accrueLeaveBalance = async (profile) => {
+export const accrueLeaveBalance = async (profile) => {
   const lastUpdated =
     profile.leaveBalanceLastUpdated ||
     profile.createdAt ||
     new Date();
 
+  const accrualStart = profile.joiningDate && profile.joiningDate > lastUpdated
+    ? profile.joiningDate
+    : lastUpdated;
+
   const now = new Date();
-  const elapsedMonths = getMonthsElapsed(lastUpdated, now);
+  const elapsedMonths = getMonthsElapsed(accrualStart, now);
 
   if (elapsedMonths <= 0) return profile;
 
-  const accrual = roundToTwo(elapsedMonths * 0.77);
+  const sickAccrual = roundToTwo(elapsedMonths * 0.75);
+  const casualAccrual = roundToTwo(elapsedMonths * 0.75);
 
   profile.leaveBalance.sick = roundToTwo(
-    (profile.leaveBalance.sick || 0) + accrual
+    (profile.leaveBalance.sick || 0) + sickAccrual
   );
 
   profile.leaveBalance.casual = roundToTwo(
-    (profile.leaveBalance.casual || 0) + accrual
+    (profile.leaveBalance.casual || 0) + casualAccrual
   );
 
   profile.leaveBalanceLastUpdated = now;
@@ -100,6 +141,7 @@ export const requestLeave = async (req, res) => {
       user: req.user.id,
       profile: profile._id,
       companyName: req.user.companyName,
+      requesterRole: req.user.role,
       leaveType,
       startDate,
       endDate,
@@ -152,10 +194,7 @@ export const requestLeave = async (req, res) => {
 // ================= GET LEAVE =================
 export const getLeaveRequests = async (req, res) => {
   try {
-    const query =
-      req.user.role === 'admin'
-        ? { companyName: req.user.companyName }
-        : { user: req.user.id, companyName: req.user.companyName };
+    const query = buildLeaveQueryForUser(req.user);
 
     const leaveRequests = await LeaveRequest.find(query)
       .populate('profile', 'employeeId role leaveBalance')
@@ -189,6 +228,12 @@ export const updateLeaveRequest = async (req, res) => {
       });
     }
 
+    if (!canManageLeaveRequest(req.user.role, leaveRequest.requesterRole)) {
+      return res.status(403).json({
+        message: 'You are not allowed to approve or reject this leave request',
+      });
+    }
+
     const profile = await Profile.findById(leaveRequest.profile);
 
     if (!profile) {
@@ -198,6 +243,11 @@ export const updateLeaveRequest = async (req, res) => {
     }
 
     await accrueLeaveBalance(profile);
+
+    if (!leaveRequest.requesterRole) {
+      const requestUser = await User.findById(leaveRequest.user).lean();
+      leaveRequest.requesterRole = requestUser?.role || 'employee';
+    }
 
     const { leaveType, daysRequested } = leaveRequest;
     const previousStatus = leaveRequest.status;

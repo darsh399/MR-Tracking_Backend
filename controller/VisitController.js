@@ -98,7 +98,8 @@ export const getVisitHistory = async (req, res) => {
     const filter = { companyName: req.user.companyName };
     const { startDate, endDate, mrName, doctorName } = req.query;
 
-    if (req.user.role !== 'admin') {
+    const adminRoles = ['admin', 'companyOwner', 'hr', 'hrManager', 'projectManager'];
+    if (!adminRoles.includes(req.user.role)) {
       filter.mr = req.user.id;
     }
 

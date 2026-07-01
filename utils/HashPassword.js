@@ -12,4 +12,5 @@ const hashPassword = async (password) => {
     }
 }
 
-export default hashPassword;
+export default hashPassword; 
+ 

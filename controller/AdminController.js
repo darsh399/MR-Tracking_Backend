@@ -6,7 +6,6 @@ import { sendBulkUserNotification } from '../utils/emailService.js';
 export const getDashboardStats = async (req, res) => {
   try {
     const companyFilter = { companyName: req.user.companyName };
-
     const totalMRs = await User.countDocuments({ role: 'mr', ...companyFilter });
     const totalVisits = await Visit.countDocuments(companyFilter);
     const activeUsers = await User.countDocuments({ isActive: true, ...companyFilter });
@@ -14,15 +13,15 @@ export const getDashboardStats = async (req, res) => {
 
     const visitsPerDay = await Visit.aggregate([
       { $match: companyFilter },
-      {
+      { 
         $group: {
           _id: { $dateToString: { format: '%Y-%m-%d', date: '$timestamp' } },
           count: { $sum: 1 },
         },
       },
       { $sort: { _id: 1 } },
-    ]);
-
+    ]); 
+  
     const topDoctors = await Visit.aggregate([
       { $match: companyFilter },
       {
@@ -69,11 +68,11 @@ export const getDashboardStats = async (req, res) => {
 
     res.status(200).json({
       totalMRs,
-      totalVisits,
+      totalVisits,  
       totalDoctors,
       activeUsers,
       inactiveUsers,
-      visitsPerDay,
+      visitsPerDay,          
       topDoctors,
       mrPerformance,
     });
@@ -85,19 +84,24 @@ export const getDashboardStats = async (req, res) => {
 
 export const sendCompanyEmailToAll = async (req, res) => {
   try {
-    const { subject, body } = req.body;
+    const { subject, body, recipientEmail } = req.body;
     if (!subject || !body) {
       return res.status(400).json({ message: 'Email subject and body are required' });
     }
 
-    const recipients = await User.find({
-      companyName: req.user.companyName,
-      email: { $exists: true, $ne: '' },
-    }).select('email');
+    let emailAddresses = [];
+    if (recipientEmail?.trim()) {
+      emailAddresses = [recipientEmail.trim().toLowerCase()];
+    } else {
+      const recipients = await User.find({
+        companyName: req.user.companyName,
+        email: { $exists: true, $ne: '' },
+      }).select('email');
+      emailAddresses = recipients.map((user) => user.email).filter(Boolean);
+    }
 
-    const emailAddresses = recipients.map((user) => user.email).filter(Boolean);
     if (emailAddresses.length === 0) {
-      return res.status(404).json({ message: 'No company employees found with valid email addresses' });
+      return res.status(404).json({ message: 'No valid recipient email addresses found' });
     }
 
     const results = await sendBulkUserNotification(emailAddresses, subject, body);
@@ -105,7 +109,7 @@ export const sendCompanyEmailToAll = async (req, res) => {
     const failureCount = results.filter((item) => !item.success).length;
 
     res.status(200).json({
-      message: 'Emails queued for delivery',
+      message: recipientEmail ? 'Email sent to candidate' : 'Emails queued for delivery',
       successCount,
       failureCount,
       results,
@@ -121,7 +125,7 @@ export const getAdminVisits = async (req, res) => {
     const { startDate, endDate, mrName, doctorName } = req.query;
     const filter = { companyName: req.user.companyName };
 
-    if (startDate || endDate) {
+    if (startDate || endDate) { 
       filter.timestamp = {};
       if (startDate) filter.timestamp.$gte = new Date(startDate);
       if (endDate) {

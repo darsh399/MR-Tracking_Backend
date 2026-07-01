@@ -1,4 +1,4 @@
-// Base email template with attractive styling
+  // Base email template with attractive styling
 const baseTemplate = (content) => {
   return `
     <!DOCTYPE html>
@@ -136,6 +136,25 @@ export const activateUserTemplate = (name, token) => {
   return baseTemplate(content);
 };
 
+export const otpVerificationTemplate = (name, otpCode, loginEmail, temporaryPassword) => {
+  const content = `
+    <div style="text-align: center;">
+      <div class="icon info-icon">🔐</div>
+      <h2>OTP Verification Required</h2>
+      <div class="highlight">
+        <p>Hi ${name}, your account has been created successfully.</p>
+      </div>
+      <p>To verify your account, please enter the following one-time passcode in the app:</p>
+      <p style="font-size: 24px; font-weight: 700; letter-spacing: 4px; margin: 20px 0;">${otpCode}</p>
+      <p><strong>Login email:</strong> ${loginEmail}</p>
+      ${temporaryPassword ? `<p><strong>Temporary password:</strong> ${temporaryPassword}</p>` : ''}
+      <p>Once your OTP is verified, you can log in and reset your password.</p>
+      <p style="color: #666; font-size: 14px; margin-top: 30px;">If you did not request this account, please contact your administrator.</p>
+    </div>
+  `;
+  return baseTemplate(content);
+};
+
 export const activationConfirmationTemplate = (name) => {
   const content = `
     <div style="text-align: center;">
@@ -159,6 +178,78 @@ export const activationConfirmationTemplate = (name) => {
   return baseTemplate(content);
 };
 
+export const inviteUserTemplate = (name, loginEmail, temporaryPassword) => {
+  const passwordSection = temporaryPassword
+    ? `<p><strong>Temporary password:</strong> ${temporaryPassword}</p>
+       <p>Please log in and reset your password immediately to activate your account.</p>`
+    : `<p>Please use the forgot password flow to create your own secure password before your first login.</p>`;
+
+  const content = `
+    <div style="text-align: center;">
+      <div class="icon welcome-icon">🎉</div>
+      <h2>Congratulations! You are invited</h2>
+      <div class="highlight">
+        <p>Hi ${name},</p>
+        <p>Your official company account is ready. Use the details below to sign in.</p>
+      </div>
+      <p><strong>Login email:</strong> ${loginEmail}</p>
+      ${passwordSection}
+      <a href="http://localhost:5173/login" class="btn">🔐 Login Now</a>
+      <p style="color: #666; font-size: 14px; margin-top: 30px;">
+        If the button doesn't work, open your app and sign in using the login email provided above.
+      </p>
+      <p style="color: #666; font-size: 14px;">If you did not expect this email, please contact your administrator.</p>
+    </div>
+  `;
+  return baseTemplate(content);
+};
+
+export const approvalPendingTemplate = (name, role, companyName, loginEmail = null, temporaryPassword = null) => {
+  const passwordSection = loginEmail
+    ? `<p><strong>Login email:</strong> ${loginEmail}</p>
+       ${temporaryPassword ? `<p><strong>Temporary password:</strong> ${temporaryPassword}</p>` : ''}
+       <p>Please keep these credentials secure. Your access is still pending approval.</p>`
+    : `<p>Your request is being reviewed. You will receive login instructions after approval.</p>`;
+
+  const content = `
+    <div style="text-align: center;">
+      <div class="icon info-icon">⏳</div>
+      <h2>Your access request is pending</h2>
+      <div class="highlight">
+        <p>Hi ${name},</p>
+        <p>Your request to join ${companyName} as a ${role} has been received.</p>
+      </div>
+      ${passwordSection}
+      <p style="color: #666; font-size: 14px; margin-top: 20px;">
+        Once your request is approved, you will be able to complete onboarding and sign in with the credentials above.
+      </p>
+      <p style="color: #666; font-size: 14px;">If you did not request this access, please contact your administrator.</p>
+    </div>
+  `;
+  return baseTemplate(content);
+};
+
+export const approvalGrantedTemplate = (name, loginEmail) => {
+  const content = `
+    <div style="text-align: center;">
+      <div class="icon success-icon">✅</div>
+      <h2>Access Approved</h2>
+      <div class="highlight">
+        <p>Hi ${name},</p>
+        <p>Your account request has been approved.</p>
+      </div>
+      <p><strong>Your official company email:</strong> ${loginEmail}</p>
+      <p>Use the forgot password page to set a secure password before logging in for the first time.</p>
+      <a href="http://localhost:5173/forgot-password" class="btn">🔐 Set My Password</a>
+      <p style="color: #666; font-size: 14px; margin-top: 20px;">
+        After you set a password, return to the login page and sign in with your company email.
+      </p>
+      <p style="color: #666; font-size: 14px;">If you did not expect this email, please contact your administrator.</p>
+    </div>
+  `;
+  return baseTemplate(content);
+};
+
 export const passwordResetTemplate = (name, token) => {
   const content = `
     <div style="text-align: center;">
@@ -169,12 +260,28 @@ export const passwordResetTemplate = (name, token) => {
       </div>
       <p>For security reasons, we need to verify your identity. Click the button below to reset your password securely.</p>
       <p style="color: #ff6b6b; font-weight: 600;">This link will expire in 24 hours for your security.</p>
-      <a href="http://localhost:3000/reset-password/${token}" class="btn">🔑 Reset Password</a>
+      <a href="http://localhost:5173/reset-password/${token}" class="btn">🔑 Reset Password</a>
       <p style="color: #666; font-size: 14px; margin-top: 30px;">
         If the button doesn't work, copy and paste this link:<br>
-        <span style="word-break: break-all; color: #4facfe;">http://localhost:3000/reset-password/${token}</span>
+        <span style="word-break: break-all; color: #4facfe;">http://localhost:5173/reset-password/${token}</span>
       </p>
       <p style="color: #666; font-size: 14px;">If you did not request a password reset, please ignore this email. Your account remains secure.</p>
+    </div>
+  `;
+  return baseTemplate(content);
+};
+
+export const passwordResetOtpTemplate = (name, otpCode) => {
+  const content = `
+    <div style="text-align: center;">
+      <div class="icon warning-icon">🔐</div>
+      <h2>Your Password Reset OTP</h2>
+      <div class="highlight">
+        <p>Hi ${name}, use the OTP below to reset your password securely.</p>
+      </div>
+      <p style="font-size: 24px; font-weight: 700; letter-spacing: 4px; margin: 20px 0;">${otpCode}</p>
+      <p>This code will expire in 10 minutes.</p>
+      <p style="color: #666; font-size: 14px; margin-top: 30px;">If you did not request a password reset, please ignore this email or contact support immediately.</p>
     </div>
   `;
   return baseTemplate(content);

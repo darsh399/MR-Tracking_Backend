@@ -3,9 +3,19 @@ import mongoose from 'mongoose';
 const DataModel = mongoose.Schema({
   userName: {
     type: String,
-    required: true,
     trim: true,
     minlength: 3,
+    default: '',
+  },
+  firstName: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  lastName: {
+    type: String,
+    trim: true,
+    default: '',
   },
   email: {
     type: String,
@@ -14,10 +24,16 @@ const DataModel = mongoose.Schema({
     trim: true,
     lowercase: true,
   },
+  contactEmail: {
+    type: String,
+    trim: true,
+    lowercase: true,
+    default: '',
+  },
   mobileNo: {
     type: String,
-    required: true,
     trim: true,
+    default: '',
   },
   password: {
     type: String,
@@ -26,11 +42,15 @@ const DataModel = mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'mr'],
+    enum: ['admin', 'mr', 'employee', 'companyOwner', 'hr', 'hrManager', 'projectManager'],
     default: 'mr',
   },
-
   company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    required: true,
+  },
+  companyId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',
     required: true,
@@ -40,10 +60,54 @@ const DataModel = mongoose.Schema({
     required: true,
     trim: true,
   },
-
+  joiningDate: {
+    type: Date,
+    default: null,
+  },
   profileCompleted: {
     type: Boolean,
     default: false,
+  },
+  isFirstLogin: {
+    type: Boolean,
+    default: false,
+  },
+  isOnboarded: {
+    type: Boolean,
+    default: false,
+  },
+  resetPasswordToken: {
+    type: String,
+    default: null,
+  },
+  resetPasswordExpires: {
+    type: Date,
+    default: null,
+  },
+  passwordResetOtp: {
+    type: String,
+    default: null,
+  },
+  passwordResetOtpExpires: {
+    type: Date,
+    default: null,
+  },
+  verificationCode: {
+    type: String,
+    default: null,
+  },
+  verificationCodeExpires: {
+    type: Date,
+    default: null,
+  },
+  isVerified: {
+    type: Boolean,
+    default: true,
+  },
+  requestStatus: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
   },
   approved: {
     type: Boolean,
