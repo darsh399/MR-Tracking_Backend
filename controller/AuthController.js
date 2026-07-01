@@ -655,12 +655,24 @@ export const getUserById = async (req, res) => {
     }
 
     const companyFilter = req.user.companyName;
-    const [profile, leaves, visits, doctors] = await Promise.all([
-      Profile.findOne({ user: userId }),
+    const [profileDoc, leaves, visits, doctors] = await Promise.all([
+      Profile.findOne({ user: userId }).populate('user', 'userName email role companyName').lean(),
       Leave.find({ user: userId }).sort({ createdAt: -1 }),
       Visit.find({ mr: userId }).sort({ createdAt: -1 }),
       Doctor.find({ mr: userId, companyName: companyFilter }).sort({ createdAt: -1 }),
     ]);
+
+    let profile = profileDoc;
+    if (profile?.reportsTo) {
+      const manager = await Profile.findById(profile.reportsTo).populate('user', 'userName').lean();
+      profile = {
+        ...profile,
+        managerName: manager?.user?.userName || '',
+        managerDesignation: manager?.designation || manager?.role || '',
+        managerEmployeeId: manager?.employeeId || '',
+        managerUserId: manager?.user?._id || manager?.user || '',
+      };
+    }
 
     res.status(200).json({
       user,

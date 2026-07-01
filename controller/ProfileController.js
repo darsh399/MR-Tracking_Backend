@@ -2,6 +2,7 @@ import fs from 'fs';
 import multer from 'multer';
 import Profile from '../model/ProfileModel.js';
 import User from '../model/DataModel.js';
+import mongoose from 'mongoose';
 import path from 'path';
 import hashPassword from '../utils/HashPassword.js';
 import bcrypt from 'bcrypt';
@@ -49,6 +50,59 @@ const buildExperienceMonths = (years, months) => {
   return parsedYears * 12 + parsedMonths;
 };
 
+const normalizeManagerRef = async (value, companyName) => {
+  if (!value) return null;
+  if (mongoose.Types.ObjectId.isValid(value)) {
+    const managerProfile = await Profile.findOne({ _id: value, companyName }).lean();
+    return managerProfile?._id || null;
+  }
+  return null;
+};
+
+const populateManagerMeta = async (profile) => {
+  if (!profile?.reportsTo) return profile;
+  const managerProfile = await Profile.findById(profile.reportsTo).populate('user', 'userName').lean();
+  if (!managerProfile) return profile;
+  return {
+    ...profile,
+    managerName: managerProfile.user?.userName || managerProfile.managerName || '',
+    managerDesignation: managerProfile.designation || managerProfile.role || '',
+    managerEmployeeId: managerProfile.employeeId || '',
+    managerUserId: managerProfile.user?._id || managerProfile.user || '',
+  };
+};
+
+const getDefaultManagerId = async (targetRole, companyName, excludeProfileId = null) => {
+  if (!targetRole || targetRole === 'companyOwner') return null;
+
+  const managerRoles = ['companyOwner', 'admin', 'hrManager', 'hr'];
+  const rolePriority = {
+    companyOwner: 0,
+    admin: 1,
+    hrManager: 2,
+    hr: 3,
+  };
+  const query = {
+    companyName,
+    role: { $in: managerRoles },
+  };
+
+  if (excludeProfileId) {
+    query._id = { $ne: excludeProfileId };
+  }
+
+  const candidates = await Profile.find(query).populate('user', 'userName role').lean();
+  if (!candidates?.length) return null;
+
+  candidates.sort((a, b) => {
+    const roleA = a.user?.role || a.role;
+    const roleB = b.user?.role || b.role;
+    return (rolePriority[roleA] ?? 99) - (rolePriority[roleB] ?? 99);
+  });
+
+  return candidates[0]?._id || null;
+};
+
 export const submitProfile = async (req, res) => {
   try {
     const {
@@ -64,10 +118,12 @@ export const submitProfile = async (req, res) => {
       pincode,
       emergencyContact,
       joiningDate,
+      designation,
       experienceType = 'fresher',
       previousCompany,
       experienceYears,
       experienceMonths,
+      reportsTo,
     } = req.body;
     const role = req.user.role;
     const isCompanyOwner = role === 'companyOwner';
@@ -89,6 +145,9 @@ export const submitProfile = async (req, res) => {
         : 0;
 
     const newEmployeeId = employeeId?.trim() || `EMP${Date.now()}`;
+    const resolvedReportsTo = reportsTo
+      ? await normalizeManagerRef(reportsTo, req.user.companyName)
+      : await getDefaultManagerId(role, req.user.companyName);
 
     const documents = {
       salarySlips: req.files.salarySlips?.map((file) => file.path) || [],
@@ -112,9 +171,11 @@ export const submitProfile = async (req, res) => {
       role,
       joiningDate: joiningDate ? new Date(joiningDate) : req.user.joiningDate || new Date(),
       department: isCompanyOwner ? 'Company Owner' : department,
+      designation: designation?.trim() || '',
       experienceType: isCompanyOwner ? 'fresher' : experienceType,
       previousCompany: isCompanyOwner ? '' : (experienceType === 'experienced' ? previousCompany : ''),
       totalExperienceMonths,
+      reportsTo: resolvedReportsTo,
       documents,
       leaveBalance: { sick: 0, casual: 0, maternity: 180 },
       leaveBalanceLastUpdated: joiningDate ? new Date(joiningDate) : new Date(),
@@ -144,7 +205,8 @@ export const getProfile = async (req, res) => {
 
     await accrueLeaveBalance(profile);
     await profile.populate('user', 'userName email role companyName');
-    res.status(200).json({ profile });
+    const enrichedProfile = await populateManagerMeta(profile.toObject());
+    res.status(200).json({ profile: enrichedProfile });
   } catch (error) {
     console.error('Fetch profile error:', error.message || error);
     res.status(500).json({ message: 'Internal server error' });
@@ -171,6 +233,107 @@ export const updateLeaveBalance = async (req, res) => {
   }
 };
 
+
+export const updateReportingManager = async (req, res) => {
+  try {
+    const { userId, reportsTo } = req.body;
+    const targetUserId = userId || req.params.userId;
+    if (!targetUserId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    const targetProfile = await Profile.findOne({ user: targetUserId });
+    if (!targetProfile) {
+      return res.status(404).json({ message: 'Profile not found' });
+    }
+
+    if (targetProfile.companyName !== req.user.companyName) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const allowedRoles = ['companyOwner', 'admin', 'hr', 'hrManager'];
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({ message: 'You are not allowed to change reporting managers' });
+    }
+
+    if (reportsTo && reportsTo.toString() === targetProfile._id.toString()) {
+      return res.status(400).json({ message: 'Circular reporting is not allowed' });
+    }
+
+    if (reportsTo) {
+      const managerProfile = await Profile.findOne({ _id: reportsTo, companyName: req.user.companyName });
+      if (!managerProfile) {
+        return res.status(400).json({ message: 'Manager must belong to the same company' });
+      }
+
+      const visited = new Set([targetProfile._id.toString()]);
+      let current = managerProfile;
+      while (current?.reportsTo) {
+        if (visited.has(current.reportsTo.toString())) {
+          return res.status(400).json({ message: 'Circular reporting is not allowed' });
+        }
+        visited.add(current.reportsTo.toString());
+        current = await Profile.findById(current.reportsTo);
+      }
+    }
+
+    targetProfile.reportsTo = reportsTo ? mongoose.Types.ObjectId.createFromHexString(reportsTo) : null;
+    await targetProfile.save();
+    const updatedProfile = await Profile.findById(targetProfile._id).populate('user', 'userName').lean();
+    res.status(200).json({ profile: updatedProfile });
+  } catch (error) {
+    console.error('Update reporting manager error:', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const getEmployeeHierarchy = async (req, res) => {
+  try {
+    const targetUserId = req.params.userId || req.user.id;
+    const targetProfile = await Profile.findOne({ user: targetUserId }).lean();
+    if (!targetProfile) {
+      return res.status(404).json({ message: 'Profile not found' });
+    }
+
+    const allowedRoles = ['companyOwner', 'admin', 'hr', 'hrManager'];
+    if (!allowedRoles.includes(req.user.role) && targetUserId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const companyProfiles = await Profile.find({ companyName: req.user.companyName })
+      .populate('user', 'userName email role')
+      .lean();
+
+    res.status(200).json({ hierarchy: companyProfiles, profile: targetProfile });
+  } catch (error) {
+    console.error('Hierarchy fetch error:', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const getDirectReports = async (req, res) => {
+  try {
+    const targetUserId = req.params.userId || req.user.id;
+    const profile = await Profile.findOne({ user: targetUserId }).lean();
+    if (!profile) {
+      return res.status(404).json({ message: 'Profile not found' });
+    }
+
+    const allowedRoles = ['companyOwner', 'admin', 'hr', 'hrManager'];
+    if (!allowedRoles.includes(req.user.role) && targetUserId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const directReports = await Profile.find({ reportsTo: profile._id })
+      .populate('user', 'userName email role')
+      .lean();
+
+    res.status(200).json({ directReports });
+  } catch (error) {
+    console.error('Direct reports fetch error:', error.message || error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
 
 export const resetPassword = async (req, res) => {
   try {

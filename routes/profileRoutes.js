@@ -1,7 +1,7 @@
 import express from 'express';
 import authMiddleware from '../middleware/authMiddleware.js';
 import companyMiddleware from '../middleware/companyMiddleware.js';
-import { uploadProfileDocs, resetPassword, submitProfile, getProfile, updateLeaveBalance } from '../controller/ProfileController.js';
+import { uploadProfileDocs, resetPassword, submitProfile, getProfile, updateLeaveBalance, updateReportingManager, getEmployeeHierarchy, getDirectReports } from '../controller/ProfileController.js';
 
 const router = express.Router();
 
@@ -10,5 +10,10 @@ router.post('/complete', uploadProfileDocs, submitProfile);
 router.put('/reset-password', resetPassword);
 router.get('/me', getProfile);
 router.put('/leave-balance', updateLeaveBalance);
+router.put('/reporting-manager', updateReportingManager);
+router.get('/hierarchy', getEmployeeHierarchy);
+router.get('/hierarchy/:userId', getEmployeeHierarchy);
+router.get('/direct-reports', getDirectReports);
+router.get('/direct-reports/:userId', getDirectReports);
 
 export default router;
